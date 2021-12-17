@@ -1,0 +1,47 @@
+pipeline{
+    agent any
+    tools{
+        maven 'maven-3.0.5'
+    }
+    stages{
+        stage("chekout"){
+            steps{
+            checkout([$class: 'GitSCM', branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[credentialsId: 'git', url: 'https://github.com/bandisubbarayudu/sep29change.code.git']]])
+            }
+            
+        }
+        stage("built"){
+            steps{
+                sh 'mvn package -f pom.xml'
+            }
+        }
+          stage ('Approvals to Deploy war to QA') {
+              steps{
+                      echo "Taking approval from Manager Deploy war to QA evn"
+           timeout(time: 7, unit: 'DAYS') {
+            input message: 'Do you want to move war to NEXUS REPO?', submitter: 'bandisubbarayudu'
+           }
+        }
+    }
+
+        stage('deploy'){
+            steps{
+                deploy adapters: [tomcat9(credentialsId: 'tomcat', path: '', url: 'http://34.125.152.30:8090/')], contextPath: 'macys', war: 'target/macys.war'
+            }
+        }
+          stage ('Approvals to QA deployment') {
+              steps{
+                      echo "Taking approval from Manager for QA deployment"
+           timeout(time: 7, unit: 'DAYS') {
+            input message: 'Do you want to move war to NEXUS REPO?', submitter: 'bandisubbarayudu'
+           }
+        }
+    }
+
+                          stage('nexus'){
+            steps{
+                nexusArtifactUploader artifacts: [[artifactId: 'macys', classifier: '', file: 'target/macys.war', type: 'war']], credentialsId: 'nexus', groupId: 'com.sep30', nexusUrl: '34.125.152.30:8081', nexusVersion: 'nexus3', protocol: 'http', repository: 'maven-snapshots', version: '1.0-SNAPSHOT'
+            }
+        }
+    }
+}
